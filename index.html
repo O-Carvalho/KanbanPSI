@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSI · Andamento da Montagem - Kanban</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --psi-orange:#F47A20; --psi-orange-2:#FF9A3D; --psi-gray:#6B7077;
+    --bg:#f1f3f7; --bg-2:#ffffff; --panel:#ffffff; --panel-2:#f5f7fa; --border:#e2e6ee;
+    --text:#1f2733; --text-dim:#6b7280;
+    --andamento:#27ae60; --slot:#e0a800; --paralisado:#e74c3c; --finalizado:#2980b9; --embalado:#7f8c9a; --default:#b8bfca;
+    --ok:#16a34a; --warn:#d99e00; --bad:#dc2626;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',Arial,sans-serif; }
+  body { background:var(--bg); color:var(--text); padding:16px; }
+
+  header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px; }
+  .brand { display:flex; align-items:center; gap:12px; }
+  .brand .logo { width:46px; height:46px; border-radius:10px; flex-shrink:0;
+    background:linear-gradient(135deg,var(--psi-orange),var(--psi-orange-2));
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:20px; color:#fff;
+    box-shadow:0 4px 12px rgba(244,122,32,.30); }
+  header h1 { font-size:19px; font-weight:700; }
+  header h1 span { color:var(--psi-orange); }
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .btn { background:var(--panel-2); color:var(--text); border:1px solid var(--border); padding:9px 15px; border-radius:8px; cursor:pointer; font-size:13px; transition:.15s; }
+  .btn:hover { border-color:var(--psi-orange); color:var(--psi-orange); }
+  .btn-primary { background:linear-gradient(135deg,var(--psi-orange),var(--psi-orange-2)); border:none; color:#fff; font-weight:600; }
+  .btn-primary:hover { color:#fff; opacity:.92; }
+
+  .config-bar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px 16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  .config-bar label { font-size:12px; color:var(--text-dim); display:flex; align-items:center; gap:7px; }
+  .config-bar input { width:64px; background:var(--bg-2); border:1px solid var(--border); border-radius:7px; padding:6px 9px; font-size:13px; color:var(--text); }
+  .config-bar .obs { font-size:11px; color:var(--psi-gray); }
+
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; align-items:center; margin-bottom:14px; color:var(--text-dim); }
+  .legend span { display:flex; align-items:center; gap:6px; }
+  .dot { width:11px; height:11px; border-radius:50%; display:inline-block; }
+
+  .kpi-wrap { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  .kpi-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+  .kpi-title { font-size:14px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; }
+  .kpi-range { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .kpi-range label { font-size:11px; color:var(--text-dim); display:flex; align-items:center; gap:5px; }
+  .kpi-range input[type=date] { background:var(--bg-2); border:1px solid var(--border); border-radius:7px; padding:5px 9px; font-size:12px; color:var(--text); }
+  .kpi-range input:focus { outline:none; border-color:var(--psi-orange); }
+  .mini-btn { background:var(--psi-orange); color:#fff; border:none; border-radius:7px; padding:6px 12px; font-size:11px; font-weight:600; cursor:pointer; }
+  .mini-btn.ghost { background:var(--panel-2); color:var(--text-dim); border:1px solid var(--border); }
+  .mini-btn:hover { opacity:.9; }
+  .kpi-grid { display:flex; gap:9px; overflow-x:auto; padding-bottom:4px; }
+  .kpi-card { min-width:122px; flex:1; background:var(--bg-2); border:1px solid var(--border); border-radius:9px; padding:10px; border-top:3px solid var(--psi-orange); text-align:center; }
+  .kpi-etapa { font-size:11px; font-weight:600; color:var(--text-dim); margin-bottom:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .kpi-val { font-size:19px; font-weight:800; color:var(--text); }
+  .kpi-val small { font-size:10px; font-weight:500; color:var(--text-dim); }
+  .kpi-util { font-size:11px; color:var(--psi-orange-2); margin-top:2px; }
+  .kpi-qtd { font-size:10px; color:var(--psi-gray); margin-top:4px; }
+  .kpi-geral { border-top-color:#27ae60; }
+  .kpi-geral .kpi-val { color:#27ae60; }
+  .kpi-geral .kpi-util { color:#27ae60; opacity:.85; }
+
+  .board { display:flex; gap:12px; overflow-x:auto; padding-bottom:12px; align-items:flex-start; }
+  .col { background:var(--panel); border:1px solid var(--border); border-radius:12px; min-width:235px; max-width:235px; display:flex; flex-direction:column; max-height:calc(100vh - 240px); box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  .col-head { padding:11px 13px; font-weight:600; font-size:13px; border-bottom:2px solid var(--border); position:sticky; top:0; background:var(--panel); border-radius:12px 12px 0 0; z-index:5; }
+  .col-head-top { display:flex; justify-content:space-between; align-items:center; }
+  .col-head-top > span:first-child { border-left:3px solid var(--psi-orange); padding-left:8px; }
+  .col-count { background:var(--psi-orange); color:#fff; border-radius:10px; padding:1px 9px; font-size:11px; font-weight:700; }
+  .filter-btn { background:none; border:none; cursor:pointer; font-size:14px; margin-left:6px; color:var(--text-dim); padding:0 4px; }
+  .filter-btn.active { color:var(--psi-orange); }
+  .filter-panel { margin-top:9px; background:var(--bg-2); border:1px solid var(--border); border-radius:7px; padding:7px 9px; display:none; flex-direction:column; gap:5px; }
+  .filter-panel.open { display:flex; }
+  .filter-panel label { font-size:11px; display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text-dim); }
+  .filter-panel .none { font-size:11px; color:var(--psi-gray); }
+  .col-body { padding:9px; overflow-y:auto; display:flex; flex-direction:column; gap:9px; }
+
+  .card { background:var(--bg-2); border-radius:9px; padding:11px; border:1px solid var(--border); border-left:5px solid var(--default); box-shadow:0 1px 3px rgba(0,0,0,.05); cursor:pointer; transition:.12s; }
+  .card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,.12); border-color:var(--psi-orange); }
+  .card-top { display:flex; justify-content:space-between; align-items:center; }
+  .card-os { font-weight:700; font-size:14px; color:var(--text); }
+  .card-detail { font-size:11px; color:var(--text-dim); margin-top:4px; }
+  .card-se { font-size:12px; color:var(--text); margin-top:3px; font-weight:500; }
+  .card-lead { font-size:11px; margin-top:7px; padding-top:7px; border-top:1px dashed var(--border); color:#c8651b; font-weight:600; }
+  .status-tag { font-size:9px; padding:2px 7px; border-radius:8px; color:#fff; font-weight:600; }
+  .empty { text-align:center; color:var(--psi-gray); font-size:12px; padding:20px 0; }
+  .hint { font-size:12px; color:var(--text-dim); margin-top:4px; }
+
+  /* ===== MODAL ===== */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(2px); }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--panel); border:1px solid var(--border); border-radius:14px; max-width:680px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  .modal-head { padding:18px 22px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; position:sticky; top:0; background:var(--panel); border-radius:14px 14px 0 0; z-index:2; }
+  .modal-head h2 { font-size:18px; } .modal-head h2 span { color:var(--psi-orange); }
+  .modal-head .sub { font-size:12px; color:var(--text-dim); margin-top:4px; }
+  .modal-close { background:none; border:none; font-size:24px; cursor:pointer; color:var(--text-dim); line-height:1; }
+  .modal-close:hover { color:var(--psi-orange); }
+  .modal-body { padding:18px 22px; }
+  .totais { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  .tot-box { flex:1; min-width:130px; background:var(--bg-2); border:1px solid var(--border); border-radius:9px; padding:12px; text-align:center; }
+  .tot-box .v { font-size:22px; font-weight:800; color:var(--psi-orange); }
+  .tot-box .v small { font-size:11px; font-weight:500; color:var(--text-dim); }
+  .tot-box .l { font-size:11px; color:var(--text-dim); margin-top:3px; }
+  .tot-box.plan .v { color:#2980b9; }
+  .tot-box.desvio-ok .v { color:var(--ok); }
+  .tot-box.desvio-bad .v { color:var(--bad); }
+
+  .cmp-title { font-size:13px; font-weight:700; margin:6px 0 10px; color:var(--text); display:flex; align-items:center; gap:7px; }
+  table.cmp { width:100%; border-collapse:collapse; font-size:12px; }
+  table.cmp th, table.cmp td { padding:9px 8px; border-bottom:1px solid var(--border); text-align:center; }
+  table.cmp th { background:var(--panel-2); color:var(--text); font-weight:600; font-size:11px; }
+  table.cmp td:first-child, table.cmp th:first-child { text-align:left; font-weight:600; }
+  table.cmp tbody tr:hover td { background:#fff7f0; }
+  table.cmp tfoot td { font-weight:800; background:var(--bg-2); border-top:2px solid var(--psi-orange); }
+  .pill { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:3px 9px; border-radius:20px; }
+  .pill.ok { background:#e7f7ec; color:var(--ok); }
+  .pill.warn { background:#fdf4dc; color:var(--warn); }
+  .pill.bad { background:#fdeaea; color:var(--bad); }
+  .pill.sem { background:#eef0f3; color:var(--psi-gray); }
+  .dz { width:9px; height:9px; border-radius:50%; }
+  .desvio-num.ok { color:var(--ok); font-weight:700; }
+  .desvio-num.bad { color:var(--bad); font-weight:700; }
+  .desvio-num.warn { color:var(--warn); font-weight:700; }
+  .sem-txt { color:var(--psi-gray); font-style:italic; }
+  .em-curso { font-style:italic; color:#27ae60; font-size:10px; }
+
+  ::-webkit-scrollbar { height:9px; width:9px; }
+  ::-webkit-scrollbar-track { background:var(--bg-2); }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:5px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--psi-gray); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">PSI</div>
+    <div>
+      <h1>Andamento da Montagem <span>· Kanban</span></h1>
+      <div class="hint" id="hint">Process Soluções Inteligentes · carregue um arquivo para começar</div>
+    </div>
+  </div>
+  <div class="toolbar">
+    <label class="btn btn-primary" for="file">Carregar Excel/CSV</label>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv" style="display:none">
+    <button class="btn" id="reload">Atualizar</button>
+  </div>
+</header>
+
+<!-- ===== CONFIG JORNADA ===== -->
+<div class="config-bar">
+  <label>Jornada diária <input type="number" id="jornada" value="8.2" min="1" step="0.1"> horas/dia</label>
+  <span class="obs">Usada para converter as horas planejadas em dias úteis no comparativo de cada OS (pop-up).</span>
+</div>
+
+<div class="legend" id="legend">
+  <span><i class="dot" style="background:var(--andamento)"></i> Em andamento</span>
+  <span><i class="dot" style="background:var(--slot)"></i> Aguardando slot</span>
+  <span><i class="dot" style="background:var(--paralisado)"></i> Paralisado</span>
+  <span><i class="dot" style="background:var(--finalizado)"></i> Finalizado</span>
+  <span><i class="dot" style="background:var(--embalado)"></i> Embalado</span>
+</div>
+
+<div class="kpi-wrap" id="kpi-wrap" style="display:none">
+  <div class="kpi-head">
+    <div class="kpi-title">&#128202; Média de lead time por etapa</div>
+    <div class="kpi-range">
+      <label>De <input type="date" id="dt-ini"></label>
+      <label>Até <input type="date" id="dt-fim"></label>
+      <button class="mini-btn" id="aplicar-range">Aplicar</button>
+      <button class="mini-btn ghost" id="limpar-range">Tudo</button>
+    </div>
+  </div>
+  <div class="kpi-grid" id="kpi-grid"></div>
+</div>
+
+<div class="board" id="board"></div>
+
+<!-- ===== MODAL ===== -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h2 id="m-os">OS</h2>
+        <div class="sub" id="m-sub"></div>
+      </div>
+      <button class="modal-close" onclick="fecharModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="m-body"></div>
+  </div>
+</div>
+
+<script>
+var ETAPAS = ["Mecanica","Eletrica","CDP","Montagem de Giga","Pre-TAF","TAF","Normalizacao","Embalagem"];
+var CORES = { "EM ANDAMENTO":"var(--andamento)", "AGUARDANDO SLOT":"var(--slot)", "PARALISADO":"var(--paralisado)", "FINALIZADO":"var(--finalizado)", "EMBALADO":"var(--embalado)" };
+var FILTROS = {}, HISTORICO = [], INDICE_OS = {}, RANGE = { ini:null, fim:null };
+
+/* ===== TABELA DE HORAS PLANEJADAS [MEC, ELE, CDP, GIGA, NORM, EMB] ===== */
+var HORAS = {
+  "SPCS|ALTA":  [27,83,38,18,15,3],
+  "SPCS|MEDIA": [18,65,33,18, 6,3],
+  "SPCS|BAIXA": [14,47,27, 9, 6,3],
+  "SAUX|ALTA":  [58,90,42,18,15,3],
+  "SAUX|MEDIA": [44,82,36,18,12,3],
+  "SAUX|BAIXA": [27,65,27,18, 6,3],
+  "CAIXA|ALTA": [18,32,14, 9,11,3],
+  "CAIXA|MEDIA":[14,23, 9, 6, 5,3],
+  "CAIXA|BAIXA":[ 9, 9, 5, 3, 3,3],
+  "PORTA|ALTA": [18,27,18,10,11,3],
+  "PORTA|MEDIA":[15,18,12, 7, 6,3],
+  "PORTA|BAIXA":[ 9, 9, 6, 4, 4,3],
+  "UTR|ALTA":   [26,40,26,12,15,3],
+  "UTR|MEDIA":  [22,27,22, 9,11,3],
+  "UTR|BAIXA":  [18,20,18, 5, 6,3]
+};
+// Mapeia cada etapa (normalizada) -> indice da operacao em HORAS. -1 = sem planejamento.
+var ETAPA_OP = {
+  "MECANICA":0, "ELETRICA":1, "CDP":2, "MONTAGEM DE GIGA":3,
+  "PRE-TAF":-1, "TAF":-1, "NORMALIZACAO":4, "EMBALAGEM":5
+};
+var LIMITE = 0.5; // tolerancia em dias para o indicador amarelo
+
+function normaliza(txt) { return String(txt||"").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""); }
+function getJornada(){ return parseFloat(document.getElementById('jornada').value)||8.2; }
+
+document.getElementById('file').addEventListener('change', function (e) {
+  var file = e.target.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function (ev) {
+    var wb = XLSX.read(ev.target.result, { type:'array', cellDates:true });
+    var ws = wb.Sheets[wb.SheetNames[0]];
+    var rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
+    HISTORICO = parsePlanilha(rows);
+    preencherRangeDatas();
+    FILTROS = {};
+    render(HISTORICO);
+  };
+  reader.readAsArrayBuffer(file);
+});
+document.getElementById('reload').addEventListener('click', function () { if (HISTORICO.length){ render(HISTORICO); } });
+
+document.getElementById('aplicar-range').addEventListener('click', function () {
+  var vi = document.getElementById('dt-ini').value, vf = document.getElementById('dt-fim').value;
+  RANGE.ini = vi ? new Date(vi+'T00:00:00') : null;
+  RANGE.fim = vf ? new Date(vf+'T23:59:59') : null;
+  if (HISTORICO.length) renderMedias();
+});
+document.getElementById('limpar-range').addEventListener('click', function () {
+  RANGE = { ini:null, fim:null };
+  document.getElementById('dt-ini').value = ''; document.getElementById('dt-fim').value = '';
+  if (HISTORICO.length) renderMedias();
+});
+
+document.getElementById('modal').addEventListener('click', function (e) { if (e.target.id === 'modal') fecharModal(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fecharModal(); });
+
+function parseData(v) {
+  if (v instanceof Date) return v;
+  if (typeof v === 'number') return new Date(Math.round((v-25569)*86400*1000));
+  var s = String(v).trim();
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (m) { var ano = (+m[3]<100) ? 2000+(+m[3]) : (+m[3]); return new Date(ano,(+m[2])-1,(+m[1]),m[4]?+m[4]:0,m[5]?+m[5]:0); }
+  var d = new Date(s); return isNaN(d.getTime()) ? null : d;
+}
+function diaChave(d) { if (!d) return null; return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2); }
+function fmtData(d) { if (!d) return "-"; var p = diaChave(d).split('-'); return p[2]+"/"+p[1]+"/"+p[0]; }
+function diasCorridos(ini,fim) { if (!ini||!fim) return 0; var a=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate()),b=new Date(fim.getFullYear(),fim.getMonth(),fim.getDate()); return Math.round((b-a)/86400000)+1; }
+function diasUteis(ini,fim) { if (!ini||!fim) return 0; var a=new Date(ini.getFullYear(),ini.getMonth(),ini.getDate()),b=new Date(fim.getFullYear(),fim.getMonth(),fim.getDate()); if (b<a) return 0; var c=0,cur=new Date(a); while(cur<=b){var dw=cur.getDay(); if(dw!==0&&dw!==6)c++; cur.setDate(cur.getDate()+1);} return c; }
+
+function parsePlanilha(rows) {
+  var hi = -1;
+  for (var i=0;i<rows.length;i++) { if (rows[i].some(function(c){return normaliza(c)==="SEQUENCIA";})) { hi=i; break; } }
+  if (hi===-1) hi=0;
+  var header = rows[hi].map(function(c){return normaliza(c);});
+  function idx(n){return header.indexOf(n);}
+  var col = { seq:idx("SEQUENCIA"), data:idx("DATA"), os:idx("OS"), projeto:idx("PROJETO"), se:idx("SUBESTACAO"), tag:idx("TAG"), tipo:idx("TIPO"), compl:idx("COMPLEXIDADE"), etapa:idx("ETAPA"), status:idx("STATUS") };
+  var out = [];
+  for (var j=hi+1;j<rows.length;j++) {
+    var r = rows[j]; if (!r) continue;
+    var osVal = String(r[col.os]!=null?r[col.os]:"").trim(); if (osVal==="") continue;
+    out.push({ seq:Number(r[col.seq])||j, data:parseData(r[col.data]), os:osVal,
+      projeto:String(r[col.projeto]||"").trim(), se:String(r[col.se]||"").trim(), tag:String(r[col.tag]||"").trim(),
+      tipo:String(r[col.tipo]||"").trim(), compl:String(r[col.compl]||"").trim(),
+      etapa:normaliza(r[col.etapa]), etapaOrig:String(r[col.etapa]||"").trim(), status:normaliza(r[col.status]) });
+  }
+  return out;
+}
+function apenasUltimoDia(registros) {
+  var dias = []; registros.forEach(function(r){var dk=diaChave(r.data); if(dk)dias.push(dk);});
+  if (!dias.length) return { lista:registros, dia:null };
+  dias.sort(); var ultimo=dias[dias.length-1];
+  return { lista:registros.filter(function(r){return diaChave(r.data)===ultimo;}), dia:ultimo };
+}
+function ultimaPosicaoPorOS(registros) {
+  var mapa = {}; registros.forEach(function(r){ if(!mapa[r.os]||r.seq>mapa[r.os].seq)mapa[r.os]=r; });
+  return Object.keys(mapa).map(function(k){return mapa[k];});
+}
+
+function calcularLeadTime(os) {
+  var regs = HISTORICO.filter(function(r){return r.os===os && r.data;});
+  regs.sort(function(a,b){return (a.data-b.data)||(a.seq-b.seq);});
+  if (!regs.length) return { etapas:[], totalCorr:0, totalUtil:0 };
+  var agora = null; HISTORICO.forEach(function(r){ if(r.data&&(!agora||r.data>agora))agora=r.data; });
+  var ordem=[], mapa={};
+  regs.forEach(function(r){
+    if (!mapa[r.etapa]) { mapa[r.etapa]={etapa:r.etapa,etapaOrig:r.etapaOrig||r.etapa,start:r.data,end:r.data,statusFinal:r.status}; ordem.push(r.etapa); }
+    else { if(r.data<mapa[r.etapa].start)mapa[r.etapa].start=r.data; if(r.data>=mapa[r.etapa].end){mapa[r.etapa].end=r.data;mapa[r.etapa].statusFinal=r.status;} }
+  });
+  var ultimaEtapa = regs[regs.length-1].etapa;
+  var etapas = ordem.map(function(etKey){
+    var e = mapa[etKey];
+    var emCurso = (etKey===ultimaEtapa) && e.statusFinal!=="FINALIZADO" && e.statusFinal!=="EMBALADO";
+    var endRef = emCurso ? agora : e.end;
+    return { etapa:e.etapa, etapaOrig:e.etapaOrig, start:e.start, end:endRef, status:e.statusFinal, emCurso:emCurso, corr:diasCorridos(e.start,endRef), util:diasUteis(e.start,endRef) };
+  });
+  var primeiro = etapas[0].start, ultimo = etapas[etapas.length-1].end;
+  return { etapas:etapas, totalCorr:diasCorridos(primeiro,ultimo), totalUtil:diasUteis(primeiro,ultimo) };
+}
+
+/* ===== HORAS PLANEJADAS DE UMA OS ===== */
+function horasPlanejadasOS(os) {
+  var info = INDICE_OS[os] || HISTORICO.filter(function(r){return r.os===os;})[0];
+  if (!info) return null;
+  var chave = normaliza(info.tipo)+'|'+normaliza(info.compl);
+  if (!HORAS[chave]) return null;
+  return { chave:chave, horasArr:HORAS[chave] };
+}
+
+function etapaNoRange(e) {
+  if (!RANGE.ini && !RANGE.fim) return true;
+  var s=new Date(e.start.getFullYear(),e.start.getMonth(),e.start.getDate());
+  var f=new Date(e.end.getFullYear(),e.end.getMonth(),e.end.getDate());
+  var ini=RANGE.ini?new Date(RANGE.ini.getFullYear(),RANGE.ini.getMonth(),RANGE.ini.getDate()):null;
+  var fim=RANGE.fim?new Date(RANGE.fim.getFullYear(),RANGE.fim.getMonth(),RANGE.fim.getDate()):null;
+  if (ini && f<ini) return false;
+  if (fim && s>fim) return false;
+  return true;
+}
+function preencherRangeDatas() {
+  var min=null,max=null;
+  HISTORICO.forEach(function(r){ if(!r.data)return; if(!min||r.data<min)min=r.data; if(!max||r.data>max)max=r.data; });
+  if (min) document.getElementById('dt-ini').value = diaChave(min);
+  if (max) document.getElementById('dt-fim').value = diaChave(max);
+}
+
+function calcularMedias() {
+  var osSet={}; HISTORICO.forEach(function(r){osSet[r.os]=true;});
+  var acc={}; ETAPAS.forEach(function(e){acc[normaliza(e)]={somaCorr:0,somaUtil:0,qtd:0};});
+  var geral={somaCorr:0,somaUtil:0,qtd:0};
+  Object.keys(osSet).forEach(function(os){
+    var lt=calcularLeadTime(os); var entrou=false,tCorr=0,tUtil=0;
+    lt.etapas.forEach(function(e){
+      if(!etapaNoRange(e))return;
+      var k=e.etapa; if(!acc[k])acc[k]={somaCorr:0,somaUtil:0,qtd:0};
+      acc[k].somaCorr+=e.corr; acc[k].somaUtil+=e.util; acc[k].qtd+=1;
+      entrou=true; tCorr+=e.corr; tUtil+=e.util;
+    });
+    if(entrou){geral.somaCorr+=tCorr;geral.somaUtil+=tUtil;geral.qtd+=1;}
+  });
+  return { acc:acc, geral:geral };
+}
+
+function renderMedias() {
+  if (!HISTORICO.length) return;
+  var res=calcularMedias(), acc=res.acc, geral=res.geral;
+  var grid=document.getElementById('kpi-grid'); grid.innerHTML="";
+  var gCorr=geral.qtd?(geral.somaCorr/geral.qtd):0, gUtil=geral.qtd?(geral.somaUtil/geral.qtd):0;
+  var gbox=document.createElement('div'); gbox.className='kpi-card kpi-geral';
+  gbox.innerHTML='<div class="kpi-etapa">LEAD TIME TOTAL</div><div class="kpi-val">'+gCorr.toFixed(1)+'<small>d corr.</small></div><div class="kpi-util">'+gUtil.toFixed(1)+'d úteis</div><div class="kpi-qtd">'+geral.qtd+' OS</div>';
+  grid.appendChild(gbox);
+  ETAPAS.forEach(function(etapa){
+    var a=acc[normaliza(etapa)]||{somaCorr:0,somaUtil:0,qtd:0};
+    var medCorr=a.qtd?(a.somaCorr/a.qtd):0, medUtil=a.qtd?(a.somaUtil/a.qtd):0;
+    var box=document.createElement('div'); box.className='kpi-card';
+    box.innerHTML='<div class="kpi-etapa" title="'+etapa+'">'+etapa+'</div><div class="kpi-val">'+medCorr.toFixed(1)+'<small>d corr.</small></div><div class="kpi-util">'+medUtil.toFixed(1)+'d úteis</div><div class="kpi-qtd">'+a.qtd+' OS</div>';
+    grid.appendChild(box);
+  });
+  document.getElementById('kpi-wrap').style.display='block';
+  var titulo=document.querySelector('.kpi-title');
+  if (RANGE.ini || RANGE.fim) {
+    var di=RANGE.ini?fmtData(RANGE.ini):'início', df=RANGE.fim?fmtData(RANGE.fim):'hoje';
+    titulo.innerHTML='&#128202; Média de lead time por etapa <span style="font-weight:400;color:var(--psi-orange)">('+di+' a '+df+')</span>';
+  } else {
+    titulo.innerHTML='&#128202; Média de lead time por etapa <span style="font-weight:400;color:var(--text-dim)">(histórico completo)</span>';
+  }
+}
+
+/* ===== MODAL COM COMPARATIVO POSTO A POSTO ===== */
+function abrirModal(os) {
+  var info=INDICE_OS[os], lt=calcularLeadTime(os);
+  var plan=horasPlanejadasOS(os);
+  var jornada=getJornada();
+
+  document.getElementById('m-os').innerHTML="OS <span>"+os+"</span>";
+  document.getElementById('m-sub').textContent=info?(info.tag+" | "+info.tipo+" | "+info.compl+" | "+info.se):"";
+
+  // Acumuladores totais
+  var totPlanH=0, totPlanD=0, totRealD=0, temAlgumPlan=false;
+
+  // Monta linhas da tabela posto a posto
+  var linhas='';
+  if (!lt.etapas.length) {
+    linhas='<tr><td colspan="6" class="empty">Sem histórico para esta OS.</td></tr>';
+  } else {
+    lt.etapas.forEach(function(e){
+      var opIdx = ETAPA_OP.hasOwnProperty(e.etapa) ? ETAPA_OP[e.etapa] : -1;
+      var temPlan = (plan && opIdx>=0);
+      var planH = temPlan ? plan.horasArr[opIdx] : null;
+      var planD = temPlan ? (planH/jornada) : null;
+      var realD = e.util;
+
+      var statusCor = CORES[e.status]||"var(--default)";
+      var etapaCell = '<span style="border-left:3px solid '+statusCor+';padding-left:7px">'+e.etapaOrig+'</span>'+(e.emCurso?' <span class="em-curso">(em curso)</span>':'');
+
+      if (temPlan) {
+        var desvio = realD - planD;
+        totPlanH+=planH; totPlanD+=planD; temAlgumPlan=true;
+        var cls, pill, ico;
+        if (desvio > LIMITE) { cls='bad'; pill='bad'; ico='🔴'; }
+        else if (desvio > 0) { cls='warn'; pill='warn'; ico='🟡'; }
+        else { cls='ok'; pill='ok'; ico='🟢'; }
+        var sit = (desvio>LIMITE)?'Estourou':(desvio>0?'No limite':'No prazo');
+        linhas+='<tr>'+
+          '<td>'+etapaCell+'</td>'+
+          '<td>'+planH+'h</td>'+
+          '<td>'+planD.toFixed(2)+'d</td>'+
+          '<td>'+realD+'d</td>'+
+          '<td class="desvio-num '+cls+'">'+(desvio>0?'+':'')+desvio.toFixed(2)+'d</td>'+
+          '<td><span class="pill '+pill+'">'+ico+' '+sit+'</span></td>'+
+          '</tr>';
+      } else {
+        linhas+='<tr>'+
+          '<td>'+etapaCell+'</td>'+
+          '<td class="sem-txt">—</td>'+
+          '<td class="sem-txt">—</td>'+
+          '<td>'+realD+'d</td>'+
+          '<td class="sem-txt">—</td>'+
+          '<td><span class="pill sem">sem plano</span></td>'+
+          '</tr>';
+      }
+      totRealD+=realD;
+    });
+  }
+
+  // Totais (cards)
+  var desvioTot = totRealD - totPlanD;
+  var tBox='';
+  tBox+='<div class="tot-box plan"><div class="v">'+totPlanD.toFixed(1)+'<small>d</small></div><div class="l">Planejado ('+totPlanH+'h ÷ '+jornada+')</div></div>';
+  tBox+='<div class="tot-box"><div class="v">'+totRealD+'<small>d úteis</small></div><div class="l">Realizado (lead time)</div></div>';
+  tBox+='<div class="tot-box '+(desvioTot<=0?'desvio-ok':'desvio-bad')+'"><div class="v">'+(desvioTot>0?'+':'')+desvioTot.toFixed(1)+'<small>d</small></div><div class="l">Desvio total</div></div>';
+
+  // Rodape da tabela
+  var foot='';
+  if (temAlgumPlan) {
+    var fcls = desvioTot<=0?'ok':'bad';
+    foot='<tfoot><tr>'+
+      '<td>TOTAL</td>'+
+      '<td>'+totPlanH+'h</td>'+
+      '<td>'+totPlanD.toFixed(2)+'d</td>'+
+      '<td>'+totRealD+'d</td>'+
+      '<td class="desvio-num '+fcls+'">'+(desvioTot>0?'+':'')+desvioTot.toFixed(2)+'d</td>'+
+      '<td><span class="pill '+fcls+'">'+(desvioTot<=0?'🟢 No prazo':'🔴 Estourou')+'</span></td>'+
+      '</tr></tfoot>';
+  }
+
+  var html =
+    '<div class="totais">'+tBox+'</div>'+
+    '<div class="cmp-title">&#9878;&#65039; Planejado × Realizado — posto a posto <span style="font-weight:400;color:var(--text-dim);font-size:11px">(jornada '+jornada+'h/dia)</span></div>'+
+    '<table class="cmp">'+
+      '<thead><tr><th>Posto / Etapa</th><th>Plan. (h)</th><th>Plan. (dias)</th><th>Real (dias)</th><th>Desvio</th><th>Situação</th></tr></thead>'+
+      '<tbody>'+linhas+'</tbody>'+foot+
+    '</table>'+
+    (plan?'':'<div style="margin-top:12px;font-size:11px;color:var(--psi-gray)">⚠️ Esta OS ('+(info?info.tipo+' / '+info.compl:'?')+') não tem horas planejadas cadastradas na tabela.</div>');
+
+  document.getElementById('m-body').innerHTML=html;
+  document.getElementById('modal').classList.add('open');
+}
+function fecharModal() { document.getElementById('modal').classList.remove('open'); }
+
+function togglePainel(k) { var p=document.getElementById('panel-'+k); if(p)p.classList.toggle('open'); }
+function toggleStatus(k,s) { if(!FILTROS[k])FILTROS[k]={}; if(FILTROS[k][s])delete FILTROS[k][s]; else FILTROS[k][s]=true; render(HISTORICO); }
+
+function render(registros) {
+  renderMedias();
+  var filtrado=apenasUltimoDia(registros);
+  var atuais=ultimaPosicaoPorOS(filtrado.lista);
+  INDICE_OS={}; atuais.forEach(function(c){INDICE_OS[c.os]=c;});
+  if (filtrado.dia) { var p=filtrado.dia.split('-'); document.getElementById('hint').textContent="Process Soluções Inteligentes · registros de "+p[2]+"/"+p[1]+"/"+p[0]+" · clique no card para ver o comparativo posto a posto"; }
+
+  var board=document.getElementById('board'); board.innerHTML="";
+  ETAPAS.forEach(function(etapa){
+    var etapaKey=normaliza(etapa);
+    var itensTodos=atuais.filter(function(c){return c.etapa===etapaKey;});
+    var statusSet={}; itensTodos.forEach(function(c){if(c.status)statusSet[c.status]=true;});
+    var statusList=Object.keys(statusSet).sort();
+    var ocultos=FILTROS[etapaKey]||{};
+    var itens=itensTodos.filter(function(c){return !ocultos[c.status];});
+    var temFiltro=Object.keys(ocultos).length>0;
+
+    var col=document.createElement('div'); col.className='col';
+    var checks="";
+    if (!statusList.length) checks='<span class="none">sem status nesta coluna</span>';
+    else statusList.forEach(function(st){ var cor=CORES[st]||"var(--default)"; checks+='<label><input type="checkbox" '+(ocultos[st]?"":"checked")+' onchange="toggleStatus(\''+etapaKey+'\',\''+st+'\')"><i class="dot" style="background:'+cor+'"></i>'+st+'</label>'; });
+
+    col.innerHTML='<div class="col-head"><div class="col-head-top"><span>'+etapa+'</span><span><button class="filter-btn '+(temFiltro?'active':'')+'" title="Filtrar status" onclick="togglePainel(\''+etapaKey+'\')">&#9881;</button><span class="col-count">'+itens.length+'</span></span></div><div class="filter-panel" id="panel-'+etapaKey+'">'+checks+'</div></div><div class="col-body"></div>';
+
+    var body=col.querySelector('.col-body');
+    if (!itens.length) body.innerHTML='<div class="empty">— vazio —</div>';
+    else {
+      itens.sort(function(a,b){return a.os.localeCompare(b.os,undefined,{numeric:true});});
+      itens.forEach(function(c){
+        var cor=CORES[c.status]||"var(--default)";
+        var lt=calcularLeadTime(c.os);
+        var atual=lt.etapas.length?lt.etapas[lt.etapas.length-1]:null;
+        var leadTxt=atual?('&#9201; '+atual.corr+'d nesta etapa &bull; '+lt.totalCorr+'d total'):'';
+        var card=document.createElement('div'); card.className='card'; card.style.borderLeftColor=cor;
+        card.onclick=(function(os){return function(){abrirModal(os);};})(c.os);
+        card.innerHTML='<div class="card-top"><span class="card-os">OS '+c.os+'</span><span class="status-tag" style="background:'+cor+'">'+c.status+'</span></div><div class="card-detail">'+c.tag+' - '+c.tipo+' - '+c.compl+'</div><div class="card-se">'+c.se+'</div>'+(leadTxt?'<div class="card-lead">'+leadTxt+'</div>':'');
+        body.appendChild(card);
+      });
+    }
+    board.appendChild(col);
+  });
+}
+
+document.getElementById('board').innerHTML='<div class="empty" style="padding:50px;width:100%">Carregue o arquivo Excel/CSV exportado do SharePoint para visualizar o Kanban.</div>';
+</script>
+</body>
+</html>
