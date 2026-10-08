@@ -28,10 +28,10 @@ projs=sorted(a['CÓDIGO DO PROJETO'].unique())
 
 # ---------- estilos ----------
 F='Arial'
-f_in=Font(name=F,color='0000FF'); f_n=Font(name=F); f_b=Font(name=F,bold=True)
+f_in=Font(name=F); f_n=Font(name=F); f_b=Font(name=F,bold=True)
 f_h=Font(name=F,bold=True,color='FFFFFF'); f_t=Font(name=F,bold=True,size=14); f_link=Font(name=F,color='008000')
 f_i=Font(name=F,italic=True,size=9)
-fill_h=PatternFill('solid',fgColor='1F3864'); fill_in=PatternFill('solid',fgColor='FFF2CC')
+fill_h=PatternFill('solid',fgColor='1F3864'); fill_in=PatternFill('solid',fgColor='DDEBF7')
 fill_sub=PatternFill('solid',fgColor='D9E1F2'); fill_tot=PatternFill('solid',fgColor='EDEDED')
 STF={'MEC':'DDEBF7','ELE':'FCE4D6','PLAT':'E2EFDA','CDP':'FFF2CC','NORM':'EDE2F6'}
 thin=Side(style='thin',color='BFBFBF'); box=Border(left=thin,right=thin,top=thin,bottom=thin)
@@ -51,26 +51,26 @@ R=wb.active; R.title='LEIAME'
 
 # ---------- CARTEIRA (destino do Power Query) ----------
 K=wb.create_sheet('CARTEIRA')
-kh=['CHAVE','OS','CÓDIGO DO PROJETO','SUBESTAÇÃO','TAG','TIPO PNL','COMPLEXIDADE','ORIGEM','ETAPA','Mês Planejado','Horas / Mês']
+kh=['CHAVE','OS','CÓDIGO DO PROJETO','SUBESTAÇÃO','TAG','TIPO PNL','COMPLEXIDADE','ORIGEM','ETAPA','Mês Planejado','Horas / Mês','GIGA']
 for j,h in enumerate(kh): hdr(K,1,1+j,h)
 for i,(_,r) in enumerate(a.iterrows()):
     rr=2+i
     K.cell(rr,1,f'=B{rr}&I{rr}')
     vals=[int(r['OS']),r['CÓDIGO DO PROJETO'],r['SUBESTAÇÃO'],r['TAG'],r['TIPO PNL'],r['COMPLEXIDADE'],r['ORIGEM'],r['ETAPA'],
-          None if pd.isna(r['m']) else r['m'].date(), float(r['Horas / Mês'])]
+          None if pd.isna(r['m']) else r['m'].date(), float(r['Horas / Mês']), r['GIGA']]
     for j,v in enumerate(vals):
         x=K.cell(rr,2+j,v)
         if j==8: x.number_format='mmm/yy'
 KLAST=1+len(a)
-for c in range(1,12):
+for c in range(1,13):
     for rr in range(2,KLAST+1): K.cell(rr,c).font=f_n
-setw(K,{'A':18,'B':8,'C':40,'D':24,'E':16,'F':9,'G':12,'H':9,'I':15,'J':10,'K':10})
-K.freeze_panes='A2'; K.auto_filter.ref=f'A1:K{KLAST}'
+setw(K,{'A':18,'B':8,'C':40,'D':24,'E':16,'F':9,'G':12,'H':9,'I':15,'J':10,'K':10,'L':7})
+K.freeze_panes='A2'; K.auto_filter.ref=f'A1:L{KLAST}'
 
 # ---------- PARAMETROS ----------
 P=wb.create_sheet('PARAMETROS')
 P['A1']='PARÂMETROS DE CAPACIDADE'; P['A1'].font=f_t
-P['A2']='Azul com fundo amarelo = entrada. Mesma conta da aba CAPACIDADE (2) da carteira: dias × horas/dia × eficiência × pessoas.'; P['A2'].font=f_i
+P['A2']='Fundo azul claro = entrada. Mesma conta da aba CAPACIDADE (2) da carteira: dias × horas/dia × eficiência × pessoas.'; P['A2'].font=f_i
 hdr(P,4,1,'Item'); hdr(P,4,2,'Unid.')
 for i in range(NM):
     c=3+i; x=P.cell(4,c,MES[0] if i==0 else f'=EDATE({L(c-1)}4,1)')
@@ -105,13 +105,14 @@ setw(P,{'A':36,'B':10,**{L(3+i):10 for i in range(NM)}}); P.freeze_panes='C5'
 # ---------- PMP ----------
 M=wb.create_sheet('PMP',1)
 M['A1']='PMP — PLANO MESTRE DE PRODUÇÃO'; M['A1'].font=f_t
-M['A2']='Você digita só o que é AZUL: a OS (coluna A), as premissas (data alvo, doc, material) e, em cada etapa, as horas REALIZADAS e se CONCLUIU (S). O resto vem da aba CARTEIRA por PROCV.'; M['A2'].font=f_i
-base=['OS','Projeto','Subestação','TAG','Origem','Tipo','Complexidade','Data alvo (entrega)','Doc. liberada (S/N)','Material crítico OK (S/N)']
+M['A2']='Você digita só nas células de fundo AZUL CLARO: a OS (coluna A), as premissas (data alvo, doc, material, início da montagem) e, em cada etapa, as horas REALIZADAS e se CONCLUIU (S). O resto vem da aba CARTEIRA por PROCV.'; M['A2'].font=f_i
+base=['OS','Projeto','Subestação','TAG','Origem','Giga','Tipo','Complexidade','Data alvo (entrega)','Doc. liberada (S/N)','Material crítico OK (S/N)','Início montagem']
+CALVO,CDOC,CMAT,CINI,CGIGA=L(9),L(10),L(11),L(12),L(6)
 BASEN=len(base)
 for j,h in enumerate(base): hdr(M,5,1+j,h)
-hdr(M,4,1,'PAINEL (vem da carteira)'); M.merge_cells(start_row=4,start_column=1,end_row=4,end_column=7)
-hdr(M,4,8,'PREMISSAS'); M.merge_cells(start_row=4,start_column=8,end_row=4,end_column=10)
-STG=['MEC','ELE','PLAT','CDP','NORM']; ETK={'MEC':'MEC','ELE':'ELE','PLAT':'PLAT','CDP':'CDP','NORM':'NORM/INSP/EMB'}
+hdr(M,4,1,'PAINEL (vem da carteira)'); M.merge_cells(start_row=4,start_column=1,end_row=4,end_column=8)
+hdr(M,4,9,'PREMISSAS'); M.merge_cells(start_row=4,start_column=9,end_row=4,end_column=12)
+STG=['MEC','ELE','CDP','PLAT','NORM']; ETK={'MEC':'MEC','ELE':'ELE','PLAT':'PLAT','CDP':'CDP','NORM':'NORM/INSP/EMB'}
 SUB=['Mês','H. plan.','H. real.','Concl. (S/N)','Saldo']
 SC={}; c=BASEN+1
 for s in STG:
@@ -120,30 +121,34 @@ for s in STG:
     hdr(M,4,c,s if s!='NORM' else 'NORM/INSP/EMB',fill=PatternFill('solid',fgColor=STF[s]),font=f_b)
     for k,h in enumerate(SUB): hdr(M,5,c+k,h,fill=PatternFill('solid',fgColor=STF[s]),font=f_b)
     c+=5
-calc=['H. plan. total','H. real. total','Saldo total','Mês de saída','Ordem das etapas','Entrega no prazo?','Pronto p/ iniciar?','Ação PCP']
+calc=['H. plan. total','H. real. total','Saldo total','Mês de saída','Ordem das etapas','Giga x Plataforma','Início vs programado','Entrega no prazo?','Pronto p/ iniciar?','Ação PCP']
 CC={h:c+k for k,h in enumerate(calc)}
 for h,cc in CC.items(): hdr(M,5,cc,h)
 hdr(M,4,c,'TOTAIS E VERIFICAÇÕES'); M.merge_cells(start_row=4,start_column=c,end_row=4,end_column=c+len(calc)-1)
 LASTCOL=c+len(calc)-1
 ROW0=6; MAXR=800
 yn=DataValidation(type='list',formula1='"S,N"',allow_blank=True); M.add_data_validation(yn)
-KR='CARTEIRA!$A:$K'; KB='CARTEIRA!$B:$K'
+KR='CARTEIRA!$A:$L'; KB='CARTEIRA!$B:$L'
 for i in range(MAXR-ROW0+1):
     rr=ROW0+i; os_=OSL[i] if i<len(OSL) else None
     x=M.cell(rr,1,os_); x.font=f_in
     for j,col in enumerate([2,3,4,7,5,6]):   # Projeto,SE,TAG,Origem,Tipo,Compl -> col idx em CARTEIRA!B:K
         tgt=[2,3,4,5,6,7][j]
     # Projeto(2) SE(3) TAG(4) Origem(5) Tipo(6) Compl(7)  -> índices em B:K: proj 2, se 3, tag 4, tipo 5, compl 6, origem 7
-    for colM,idx in [(2,2),(3,3),(4,4),(5,7),(6,5),(7,6)]:
+    for colM,idx in [(2,2),(3,3),(4,4),(5,7),(6,11),(7,5),(8,6)]:
         M.cell(rr,colM,f'=IF($A{rr}="","",IFERROR(VLOOKUP($A{rr},{KB},{idx},FALSE),""))').font=f_n
     e=extra.get(os_,{}) if os_ else {}
-    x=M.cell(rr,8,e.get('alvo')); x.font=f_in; x.number_format='dd/mm/yy'
-    M.cell(rr,9,e.get('doc')).font=f_in; M.cell(rr,10,e.get('mat')).font=f_in
-    yn.add(M.cell(rr,9)); yn.add(M.cell(rr,10))
+    x=M.cell(rr,9,e.get('alvo')); x.font=f_in; x.number_format='dd/mm/yy'
+    M.cell(rr,10,e.get('doc')).font=f_in; M.cell(rr,11,e.get('mat')).font=f_in
+    yn.add(M.cell(rr,10)); yn.add(M.cell(rr,11))
+    x=M.cell(rr,12); x.font=f_in; x.number_format='dd/mm/yy'
     for s in STG:
         d=SC[s]; key=f'$A{rr}&"{ETK[s]}"'
         x=M.cell(rr,d['mes'],f'=IF($A{rr}="",0,IFERROR(VLOOKUP({key},{KR},10,FALSE),0))'); x.number_format=MFMT; x.font=f_n
-        x=M.cell(rr,d['plan'],f'=IF($A{rr}="",0,IFERROR(VLOOKUP({key},{KR},11,FALSE),0))'); x.number_format=HFMT; x.font=f_n
+        if s=='PLAT':
+            x=M.cell(rr,d['plan'],f'=IF(${CGIGA}{rr}="SIM",IFERROR(VLOOKUP({key},{KR},11,FALSE),0),0)')
+        else:
+            x=M.cell(rr,d['plan'],f'=IF($A{rr}="",0,IFERROR(VLOOKUP({key},{KR},11,FALSE),0))'); x.number_format=HFMT; x.font=f_n
         x=M.cell(rr,d['real']); x.font=f_in; x.number_format='0'
         x=M.cell(rr,d['concl']); x.font=f_in; x.alignment=Alignment(horizontal='center'); yn.add(x)
         P_,R_,C_=L(d['plan']),L(d['real']),L(d['concl'])
@@ -155,13 +160,17 @@ for i in range(MAXR-ROW0+1):
     ms=','.join(f'{L(SC[s]["mes"])}{rr}' for s in STG)
     M.cell(rr,CC['Mês de saída'],f'=MAX({ms})').number_format=MFMT
     m={s:f'{L(SC[s]["mes"])}{rr}' for s in STG}
-    pairs=[('MEC','ELE'),('MEC','PLAT'),('MEC','CDP'),('MEC','NORM'),('ELE','PLAT'),('ELE','CDP'),('ELE','NORM'),('PLAT','NORM'),('CDP','NORM')]
+    pairs=[(STG[x1],STG[x2]) for x1 in range(5) for x2 in range(x1+1,5)]
     conds=','.join(f'AND({m[x1]}>0,{m[x2]}>0,{m[x1]}>{m[x2]})' for x1,x2 in pairs)
     M.cell(rr,CC['Ordem das etapas'],f'=IF($A{rr}="","",IF(OR({conds}),"ERRO DE ORDEM","OK"))')
     sa=f'{L(CC["Mês de saída"])}{rr}'
-    M.cell(rr,CC['Entrega no prazo?'],f'=IF(OR($H{rr}="",{sa}=0),"",IF({sa}>DATE(YEAR($H{rr}),MONTH($H{rr}),1),"ATRASA","NO PRAZO"))')
+    M.cell(rr,CC['Entrega no prazo?'],f'=IF(OR(${CALVO}{rr}="",{sa}=0),"",IF({sa}>DATE(YEAR(${CALVO}{rr}),MONTH(${CALVO}{rr}),1),"ATRASA","NO PRAZO"))')
+    pk=f'IFERROR(VLOOKUP($A{rr}&"PLAT",{KR},11,FALSE),0)'
+    M.cell(rr,CC['Giga x Plataforma'],f'=IF($A{rr}="","",IF(AND(${CGIGA}{rr}="SIM",{pk}=0),"FALTA PLAT",IF(AND(${CGIGA}{rr}<>"SIM",{pk}>0),"ERRO: PLAT SEM GIGA","OK")))')
+    mm=m['MEC']; ini=f'${CINI}{rr}'
+    M.cell(rr,CC['Início vs programado'],f'=IF(OR($A{rr}="",{mm}=0),"",IF({ini}="",IF(EOMONTH({mm},0)<TODAY(),"NÃO INICIOU",""),IF({ini}>EOMONTH({mm},0),"INICIOU ATRASADO",IF({ini}<{mm},"ADIANTADO","NO PRAZO"))))')
     mec=m['MEC']; smec=f'{L(SC["MEC"]["saldo"])}{rr}'
-    M.cell(rr,CC['Pronto p/ iniciar?'],f'=IF($A{rr}="","",IF(AND($I{rr}="S",$J{rr}="S"),"LIBERADO",IF({smec}=0,"-",IF(AND({mec}>0,{mec}<=EDATE(PARAMETROS!$C$4,1)),"RISCO","PENDENTE"))))')
+    M.cell(rr,CC['Pronto p/ iniciar?'],f'=IF($A{rr}="","",IF(AND(${CDOC}{rr}="S",${CMAT}{rr}="S"),"LIBERADO",IF({smec}=0,"-",IF(AND({mec}>0,{mec}<=EDATE(PARAMETROS!$C$4,1)),"RISCO","PENDENTE"))))')
     past=','.join(f'AND({L(SC[s]["mes"])}{rr}>0,{L(SC[s]["mes"])}{rr}<PARAMETROS!$C$4,{L(SC[s]["saldo"])}{rr}>0)' for s in STG)
     nom=','.join(f'AND({L(SC[s]["mes"])}{rr}=0,{L(SC[s]["saldo"])}{rr}>0)' for s in STG)
     M.cell(rr,CC['Ação PCP'],f'=IF($A{rr}="","",IF(OR({past}),"REPROGRAMAR",IF(OR({nom}),"SEM MÊS","")))')
@@ -170,14 +179,16 @@ for i in range(MAXR-ROW0+1):
         if cc>=CC['H. plan. total']: x.font=f_n
     for s in STG:
         M.cell(rr,SC[s]['real']).fill=fill_in; M.cell(rr,SC[s]['concl']).fill=fill_in
-    for cc in (1,8,9,10): M.cell(rr,cc).fill=fill_in
+    for cc in (1,9,10,11,12): M.cell(rr,cc).fill=fill_in
 NR=len(OSL)
 red=PatternFill('solid',fgColor='F8CBAD'); amb=PatternFill('solid',fgColor='FFE699'); grn=PatternFill('solid',fgColor='C6EFCE')
 rng=f'{L(CC["Ordem das etapas"])}{ROW0}:{L(LASTCOL)}{MAXR}'
-for txt,fl in [('ERRO DE ORDEM',red),('ATRASA',red),('RISCO',red),('REPROGRAMAR',amb),('SEM MÊS',amb),('PENDENTE',amb),('LIBERADO',grn),('NO PRAZO',grn)]:
+for txt,fl in [('FALTA PLAT',red),('ERRO: PLAT SEM GIGA',red),('INICIOU ATRASADO',red),('NÃO INICIOU',red),('ADIANTADO',grn),('ERRO DE ORDEM',red),('ATRASA',red),('RISCO',red),('REPROGRAMAR',amb),('SEM MÊS',amb),('PENDENTE',amb),('LIBERADO',grn),('NO PRAZO',grn)]:
     M.conditional_formatting.add(rng,CellIsRule(operator='equal',formula=[f'"{txt}"'],fill=fl))
 # notas explicativas nos cabeçalhos
-notes={'Ordem das etapas':'Confere se os meses respeitam a sequência da fábrica: MEC ≤ ELE ≤ CDP ≤ NORM e ELE ≤ PLAT ≤ NORM. "ERRO DE ORDEM" = alguma etapa foi programada para um mês ANTES da etapa que vem antes dela (ex.: ELE em out e MEC em nov).',
+notes={'Ordem das etapas':'Confere se os meses respeitam a sequência da fábrica: MEC → ELE → CDP → PLAT → NORM/INSP/EMB. "ERRO DE ORDEM" = alguma etapa foi programada para um mês ANTES da etapa que vem antes dela (ex.: ELE em out e MEC em nov).',
+ 'Giga x Plataforma':'Giga = SIM → tem que ter horas de Plataforma na carteira ("FALTA PLAT" se não tiver). Giga = NÃO → Plataforma tem que ser 0 ("ERRO: PLAT SEM GIGA" se a carteira tiver horas; essas horas NÃO entram na carga).',
+ 'Início vs programado':'Compara o Início montagem (real) com o mês programado da MEC. NO PRAZO = começou dentro do mês. INICIOU ATRASADO = começou depois do mês. ADIANTADO = antes. NÃO INICIOU = o mês da MEC já acabou e não tem data de início.',
  'Entrega no prazo?':'Compara o mês da última etapa (Mês de saída) com a Data alvo. "ATRASA" = pelo plano o painel termina depois do mês da data alvo. Em branco = sem data alvo.',
  'Pronto p/ iniciar?':'LIBERADO = Doc e Material = S. RISCO = falta doc ou material e a MEC está programada para este mês ou o próximo. PENDENTE = falta doc/material mas a MEC ainda está longe. "-" = MEC já concluída/sem saldo.',
  'Ação PCP':'REPROGRAMAR = alguma etapa tem saldo de horas num mês que já passou (não foi feita no mês planejado). SEM MÊS = etapa tem horas mas não tem mês na carteira. Vazio = nada a fazer.',
@@ -189,11 +200,11 @@ for s in STG:
     M.cell(5,SC[s]['real']).comment=Comment('Digite as horas realmente gastas nesta etapa (acumulado).','PMP')
 M.freeze_panes=M.cell(ROW0,5)
 M.auto_filter.ref=f'A5:{L(LASTCOL)}{ROW0+NR-1}'
-setw(M,{'A':7,'B':34,'C':20,'D':14,'E':8,'F':7,'G':10,'H':10,'I':8,'J':9})
+setw(M,{'A':7,'B':34,'C':20,'D':14,'E':8,'F':6,'G':7,'H':10,'I':10,'J':8,'K':9,'L':10})
 for s in STG:
     for k,w in zip(['mes','plan','real','concl','saldo'],(8,6,6,6,6)): M.column_dimensions[L(SC[s][k])].width=w
-for h,w in zip(calc,(7,7,7,8,11,10,10,12)): M.column_dimensions[L(CC[h])].width=w
-M.column_dimensions['F'].hidden=True; M.column_dimensions['G'].hidden=True
+for h,w in zip(calc,(7,7,7,8,11,12,12,10,10,12)): M.column_dimensions[L(CC[h])].width=w
+M.column_dimensions['G'].hidden=True; M.column_dimensions['H'].hidden=True
 M.row_dimensions[5].height=42
 
 # ---------- CARGA x CAPACIDADE ----------
@@ -247,10 +258,13 @@ for rr in UT:
 # conferência carteira x PMP
 r+=0
 hdr(C,r,1,'CONFERÊNCIA'); C.merge_cells(start_row=r,start_column=1,end_row=r,end_column=4)
-C.cell(r+1,1,'Horas na aba CARTEIRA').font=f_n; C.cell(r+1,4,'=SUM(CARTEIRA!K:K)').number_format='#,##0'
+C.cell(r+1,1,'Horas na aba CARTEIRA').font=f_n; CF0=r; C.cell(r+1,4,'=SUM(CARTEIRA!K:K)').number_format='#,##0'
 C.cell(r+2,1,'Horas planejadas no PMP').font=f_n; C.cell(r+2,4,f'=SUM({rngc(CC["H. plan. total"])})').number_format='#,##0'
+C.cell(r+3,1,'Horas de PLAT ignoradas (Giga = NÃO)').font=f_n
+C.cell(r+3,4,'=SUMIFS(CARTEIRA!K:K,CARTEIRA!I:I,"PLAT",CARTEIRA!L:L,"<>SIM")').number_format='#,##0;(#,##0);-'
+r+=1
 C.cell(r+3,1,'Diferença (≠ 0 → tem OS na carteira que não está no PMP, ou OS+etapa duplicada)').font=f_b
-x=C.cell(r+3,4,f'=D{r+1}-D{r+2}'); x.number_format='#,##0;(#,##0);-'; x.font=f_b
+x=C.cell(r+3,4,f'=D{r}-D{r+1}-D{r+2}'); x.number_format='#,##0;(#,##0);-'; x.font=f_b
 C.conditional_formatting.add(f'D{r+3}',CellIsRule(operator='notEqual',formula=['0'],fill=red))
 CONF=r
 r+=5
@@ -314,10 +328,12 @@ txt=[('COMO FUNCIONA ESTE PMP',f_t),('',f_n),
 ('FLUXO: Carteira (aba PLANEJADO) → aba CARTEIRA (Power Query ou colar) → aba PMP (PROCV) → CARGA x CAPACIDADE e PMP MENSAL.',f_b),
 ('A carteira continua sendo onde você PLANEJA (muda o mês de uma etapa lá). O PMP só lê a carteira e soma o que você REALIZOU.',f_n),('',f_n),
 ('ABA PMP — o que cada coluna faz',f_b),
-('• OS (azul): a única coisa que você digita para um painel novo. Projeto, Subestação, TAG, Origem, Tipo e Complexidade vêm da CARTEIRA por PROCV.',f_n),
-('• Data alvo / Doc. liberada / Material crítico (azul): suas premissas.',f_n),
+('• OS (fundo azul claro): a única coisa que você digita para um painel novo. Projeto, Subestação, TAG, Origem, Tipo e Complexidade vêm da CARTEIRA por PROCV.',f_n),
+('• Data alvo / Doc. liberada / Material crítico / Início montagem: suas premissas (fundo azul claro). Giga vem da carteira.',f_n),
 ('• Em cada etapa: Mês e H. plan. vêm da carteira (PROCV pela chave OS&ETAPA). H. real. e Concl. (S/N) você digita. Saldo = plan − real (zera se Concl. = S).',f_n),
-('• Ordem das etapas: ERRO DE ORDEM se uma etapa foi programada antes da anterior (MEC ≤ ELE ≤ CDP ≤ NORM; ELE ≤ PLAT ≤ NORM).',f_n),
+('• Ordem das etapas: ERRO DE ORDEM se uma etapa foi programada antes da anterior (MEC → ELE → CDP → PLAT → NORM/INSP/EMB).',f_n),
+('• Giga x Plataforma: Giga SIM exige horas de PLAT (FALTA PLAT); Giga NÃO exige PLAT = 0 (ERRO: PLAT SEM GIGA — essas horas não entram na carga).',f_n),
+('• Início vs programado: compara a data real de início da montagem com o mês programado da MEC (NO PRAZO / INICIOU ATRASADO / ADIANTADO / NÃO INICIOU).',f_n),
 ('• Entrega no prazo?: ATRASA se o mês de saída (última etapa) é depois do mês da data alvo.',f_n),
 ('• Pronto p/ iniciar?: LIBERADO (doc e material S) · RISCO (falta algo e a MEC é este mês ou o próximo) · PENDENTE (falta algo, mas há tempo).',f_n),
 ('• Ação PCP: REPROGRAMAR (sobrou saldo em mês que já passou) · SEM MÊS (etapa com horas mas sem mês na carteira).',f_n),('',f_n),
@@ -327,7 +343,7 @@ txt=[('COMO FUNCIONA ESTE PMP',f_t),('',f_n),
 ('3. Renomeie a consulta para CARTEIRA. Página Inicial > Fechar e Carregar Para… > Tabela > Planilha Existente: =CARTEIRA!$A$1 (apague antes os dados que estão lá).',f_n),
 ('4. Daí pra frente: Dados > Atualizar Tudo. O PMP se atualiza sozinho.',f_n),
 ('   Carteira no SharePoint/OneDrive? Abra a carteira no Excel desktop, Arquivo > Informações > Copiar Caminho, e use Web.Contents("<link>") no lugar de File.Contents(Caminho).',f_n),
-('   Sem Power Query: copie as colunas da aba PLANEJADO e cole como valores na aba CARTEIRA, na mesma ordem (B:K). A coluna A (CHAVE) é =B2&I2.',f_n),
+('   Sem Power Query: copie as colunas da aba PLANEJADO e cole como valores na aba CARTEIRA, na mesma ordem (B:L). A coluna A (CHAVE) é =B2&I2.',f_n),
 ('',f_n),('CÓDIGO POWER QUERY (M):',f_b)]
 txt+= [(l,Font(name='Consolas',size=9)) for l in pq.splitlines()]
 txt+=[('',f_n),('CONFERÊNCIA',f_b),('Na aba CARGA x CAPACIDADE, o bloco CONFERÊNCIA compara as horas da CARTEIRA com as do PMP. Se a diferença ≠ 0, há OS na carteira que ainda não está no PMP (adicione a OS na coluna A).',f_n),

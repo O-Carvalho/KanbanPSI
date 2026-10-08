@@ -7,7 +7,7 @@ python3 pmp/gerar_pmp.py "FGI_8.5-01.02_-_Carteira_de_Projetos.xlsx" PMP_PSI.xls
 ```
 
 Fluxo: carteira (tabela `PLANEJADO`) → aba `CARTEIRA` (Power Query `carteira.pq`, chave `OS&ETAPA`)
-→ aba `PMP` (PROCV) → `CARGA x CAPACIDADE` e `PMP MENSAL`.
+→ aba `PMP` (PROCV; etapas MEC → ELE → CDP → PLAT → NORM/INSP/EMB) → `CARGA x CAPACIDADE` e `PMP MENSAL`.
 
 - `PMP`: 1 linha por painel. Mês e horas planejadas vêm da carteira; horas realizadas e "Concluído" são digitados.
 - `CARGA x CAPACIDADE`: saldo (planejado − realizado) por centro × capacidade, backlog acumulado,

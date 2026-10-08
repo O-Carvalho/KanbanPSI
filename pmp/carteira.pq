@@ -6,10 +6,10 @@ let
     Fonte = Excel.Workbook(File.Contents(Caminho), null, true),
     Planejado = Fonte{[Item="PLANEJADO", Kind="Table"]}[Data],
     Ativos = Table.SelectRows(Planejado, each [OS] <> null and [PROJETO ATIVO PLANEJAMENTO] = "SIM" and [ORIGEM] <> "CANCELADO"),
-    Colunas = Table.SelectColumns(Ativos, {"OS", "CÓDIGO DO PROJETO", "SUBESTAÇÃO", "TAG", "TIPO PNL", "COMPLEXIDADE", "ORIGEM", "ETAPA", "Mês Planejado", "Horas / Mês"}),
+    Colunas = Table.SelectColumns(Ativos, {"OS", "CÓDIGO DO PROJETO", "SUBESTAÇÃO", "TAG", "TIPO PNL", "COMPLEXIDADE", "ORIGEM", "ETAPA", "Mês Planejado", "Horas / Mês", "GIGA"}),
     Tipos = Table.TransformColumnTypes(Colunas, {{"OS", Int64.Type}, {"Mês Planejado", type date}, {"Horas / Mês", type number}}),
     SemErros = Table.ReplaceErrorValues(Tipos, {{"Mês Planejado", null}, {"Horas / Mês", 0}}),
     ComChave = Table.AddColumn(SemErros, "CHAVE", each Text.From([OS]) & [ETAPA], type text),
-    Ordem = Table.ReorderColumns(ComChave, {"CHAVE", "OS", "CÓDIGO DO PROJETO", "SUBESTAÇÃO", "TAG", "TIPO PNL", "COMPLEXIDADE", "ORIGEM", "ETAPA", "Mês Planejado", "Horas / Mês"})
+    Ordem = Table.ReorderColumns(ComChave, {"CHAVE", "OS", "CÓDIGO DO PROJETO", "SUBESTAÇÃO", "TAG", "TIPO PNL", "COMPLEXIDADE", "ORIGEM", "ETAPA", "Mês Planejado", "Horas / Mês", "GIGA"})
 in
     Ordem
