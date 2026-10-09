@@ -8,6 +8,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.chart import BarChart,LineChart,Reference
 from openpyxl.chart.series import SeriesLabel
 from openpyxl.comments import Comment
+from openpyxl.worksheet.table import Table,TableStyleInfo
 warnings.filterwarnings('ignore')
 SRC,OUT,PQ=sys.argv[1],sys.argv[2],sys.argv[3]
 
@@ -24,7 +25,7 @@ for _,r in cr.iterrows():
     extra[int(r['OS'])]=dict(alvo=None if pd.isna(alvo) else alvo.date(),
         doc='S' if str(r['Data recebimento Documentação']).strip().upper()=='DISPONIVEL' else 'N',
         mat='S' if str(r['Data recebimento Material Critico']).strip().upper()=='RECEBIDO' else 'N')
-projs=sorted(a['CÓDIGO DO PROJETO'].unique())
+projs=sorted({' '.join(str(x).split()) for x in a['CÓDIGO DO PROJETO']})
 
 # ---------- estilos ----------
 F='Arial'
@@ -50,7 +51,7 @@ wb=Workbook()
 R=wb.active; R.title='LEIAME'
 
 # ---------- CARTEIRA (cópia fiel da tabela PLANEJADO; destino do Power Query) ----------
-K=wb.create_sheet('CARTEIRA')
+K=wb.create_sheet('CARTEIRA')  # tabela PLANEJADO
 kh=list(df.columns)
 for j,h in enumerate(kh): hdr(K,1,1+j,h)
 for i,row in enumerate(df.itertuples(index=False)):
@@ -67,8 +68,22 @@ KLAST=1+len(df)
 setw(K,{'A':8,'B':10,'C':40,'D':24,'E':16,'F':26,'G':9,'H':12,'I':15,'J':7,'K':14,'L':7,'M':10,'N':15,'O':8,'P':9,'Q':10,'R':10})
 K.freeze_panes='A2'; K.auto_filter.ref=f'A1:{L(len(kh))}{KLAST}'
 # colunas da CARTEIRA usadas nas fórmulas (mesma ordem da tabela PLANEJADO, começando em A)
-KC={h:L(1+j) for j,h in enumerate(kh)}
-def kcol(h): return f'CARTEIRA!${KC[h]}:${KC[h]}'
+K.add_table(Table(displayName='PLANEJADO',ref=f'A1:{L(len(kh))}{KLAST}',tableStyleInfo=TableStyleInfo(name='TableStyleLight9',showRowStripes=True)))
+def kcol(h): return f'PLANEJADO[{h}]'
+# DB PROJETOS (cadastro do SharePoint) — destino da query "DB PROJETOS", tabela DB_PROJETOS
+dbdf=pd.read_excel(SRC,sheet_name='DB PROJETOS').dropna(subset=['OS'])
+DBS=wb.create_sheet('DB PROJETOS')
+dbh=[str(c) for c in dbdf.columns]
+for j,h in enumerate(dbh): hdr(DBS,1,1+j,h)
+for i,row in enumerate(dbdf.itertuples(index=False)):
+    for j,v in enumerate(row):
+        if isinstance(v,float) and pd.isna(v): v=None
+        elif isinstance(v,pd.Timestamp): v=v.to_pydatetime()
+        elif hasattr(v,'item'): v=v.item()
+        if dbh[j]=='OS' and v is not None: v=int(v)
+        DBS.cell(2+i,1+j,v).font=f_n
+DBS.add_table(Table(displayName='DB_PROJETOS',ref=f'A1:{L(len(dbh))}{1+len(dbdf)}',tableStyleInfo=TableStyleInfo(name='TableStyleLight9',showRowStripes=True)))
+DBR='DB_PROJETOS[[OS]:[GIGA]]'   # OS=1, CÓDIGO=4, SE=5, TAG=6, TIPO=9, COMPLEX=10, GIGA=12
 ATIVO=f'{kcol("PROJETO ATIVO PLANEJAMENTO")},"SIM",{kcol("ORIGEM")},"<>CANCELADO"'
 
 # ---------- PARAMETROS ----------
@@ -132,15 +147,16 @@ hdr(M,4,c,'TOTAIS E VERIFICAÇÕES'); M.merge_cells(start_row=4,start_column=c,e
 LASTCOL=c+len(calc)-1
 ROW0=6; MAXR=800
 yn=DataValidation(type='list',formula1='"S,N"',allow_blank=True); M.add_data_validation(yn)
-KT=f'CARTEIRA!$A:${KC[kh[-1]]}'
 for i in range(MAXR-ROW0+1):
     rr=ROW0+i; os_=OSL[i] if i<len(OSL) else None
     x=M.cell(rr,1,os_); x.font=f_in
     for j,col in enumerate([2,3,4,7,5,6]):   # Projeto,SE,TAG,Origem,Tipo,Compl -> col idx em CARTEIRA!B:K
         tgt=[2,3,4,5,6,7][j]
     # Projeto(2) SE(3) TAG(4) Origem(5) Tipo(6) Compl(7)  -> índices em B:K: proj 2, se 3, tag 4, tipo 5, compl 6, origem 7
-    for colM,h in [(2,'CÓDIGO DO PROJETO'),(3,'SUBESTAÇÃO'),(4,'TAG'),(5,'ORIGEM'),(6,'GIGA'),(7,'TIPO PNL'),(8,'COMPLEXIDADE')]:
-        M.cell(rr,colM,f'=IF($A{rr}="","",IFERROR(VLOOKUP($A{rr},{KT},{kh.index(h)+1},FALSE),""))').font=f_n
+    for colM,tbl,idx,trim in [(2,DBR,4,1),(3,DBR,5,1),(4,DBR,6,1),(5,'PLANEJADO[[OS]:[ORIGEM]]',13,0),(6,DBR,12,0),(7,DBR,9,0),(8,DBR,10,0)]:
+        v=f'VLOOKUP($A{rr},{tbl},{idx},FALSE)'
+        if trim: v=f'TRIM({v})'
+        M.cell(rr,colM,f'=IF($A{rr}="","",IFERROR({v},""))').font=f_n
     e=extra.get(os_,{}) if os_ else {}
     x=M.cell(rr,9,e.get('alvo')); x.font=f_in; x.number_format='dd/mm/yy'
     M.cell(rr,10,e.get('doc')).font=f_in; M.cell(rr,11,e.get('mat')).font=f_in
